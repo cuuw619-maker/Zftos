@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
   <meta name="theme-color" content="#101114">
   <title>ZftOS</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="src/ui/style.css">
 </head>
 <body>
   <main id="os" aria-label="ZftOS">
@@ -16,28 +16,12 @@
     </header>
 
     <section class="desktop" id="desktop">
-      <div class="app-grid" id="appGrid">
-        <button class="app-icon" data-app="Files"><span class="icon files">▱</span><b>Files</b></button>
-        <button class="app-icon" data-app="Browser"><span class="icon browser">◉</span><b>Browser</b></button>
-        <button class="app-icon" data-app="Gallery"><span class="icon gallery">▣</span><b>Gallery</b></button>
-        <button class="app-icon" data-app="Settings"><span class="icon settings">⚙</span><b>Settings</b></button>
-        <button class="app-icon" data-app="Terminal"><span class="icon terminal">&gt;_</span><b>Terminal</b></button>
-        <button class="app-icon" data-app="Store"><span class="icon store">◆</span><b>Store</b></button>
-        <button class="app-icon" data-app="Messages"><span class="icon messages">•••</span><b>Messages</b></button>
-        <button class="app-icon" data-app="Music"><span class="icon music">♫</span><b>Music</b></button>
-      </div>
+      <div class="app-grid" id="appGrid" aria-label="Приложения"></div>
     </section>
 
-    <nav class="dock" aria-label="Dock">
-      <button class="dock-icon" data-app="Phone">☎</button>
-      <button class="dock-icon" data-app="Messages">•••</button>
-      <button class="dock-icon" data-app="Browser">◉</button>
-      <button class="dock-icon" data-app="Camera">●</button>
-      <button class="dock-icon" data-app="Settings">⚙</button>
-    </nav>
-
-    <div class="toast" id="toast"></div>
+    <nav class="dock" id="dock" aria-label="Dock"></nav>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
   </main>
-  <script src="app.js"></script>
+  <script type="module" src="src/core/app.js"></script>
 </body>
 </html>
