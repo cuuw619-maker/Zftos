@@ -17,6 +17,7 @@ let selected = 0;
 let active = 0;
 let pointerId = null;
 let startX = 0;
+let dragX = 0;
 let timer = 0;
 let expanded = false;
 
@@ -27,11 +28,24 @@ function render() {
     item.className = 'item';
     item.type = 'button';
     item.dataset.index = index;
-    item.innerHTML = `<span class="icon">${icon}</span><span class="label">${name}</span>`;
+    item.innerHTML = `<span class="icon">${icon}</span>`;
     item.addEventListener('click', () => select(index));
     items.appendChild(item);
   });
   update();
+}
+
+function selectionCenter(index) {
+  const item = items.children[index];
+  if (!item) return stack.clientWidth / 2;
+  return item.offsetLeft + item.offsetWidth / 2;
+}
+
+function updateSelection(animated = true) {
+  const target = expanded ? dragX : selectionCenter(selected);
+  selection.style.transition = animated ? '' : 'none';
+  selection.style.left = `${target}px`;
+  if (!animated) requestAnimationFrame(() => selection.style.transition = '');
 }
 
 function update() {
@@ -40,14 +54,8 @@ function update() {
     el.classList.toggle('selected', i === selected);
     el.classList.toggle('active', i === active);
   });
-  const target = items.children[expanded ? active : selected];
-  if (target) {
-    const a = stack.getBoundingClientRect();
-    const b = target.getBoundingClientRect();
-    selection.style.width = `${b.width}px`;
-    selection.style.height = `${b.height}px`;
-    selection.style.transform = `translate(${b.left-a.left}px,${b.top-a.top}px)`;
-  }
+  if (!expanded) dragX = selectionCenter(selected);
+  updateSelection();
   title.textContent = tabs[expanded ? active : selected][1];
 }
 
@@ -55,9 +63,6 @@ function select(index) {
   selected = index;
   active = index;
   layer.dataset.screen = index;
-  title.classList.remove('change');
-  void title.offsetWidth;
-  title.classList.add('change');
   update();
 }
 
@@ -67,6 +72,10 @@ function openStack() {
   active = selected;
   hint.classList.add('hidden');
   update();
+  requestAnimationFrame(() => {
+    dragX = selectionCenter(selected);
+    updateSelection(false);
+  });
 }
 
 function closeStack() {
@@ -74,16 +83,26 @@ function closeStack() {
   if (!expanded) return;
   expanded = false;
   select(active);
-  update();
 }
 
 function move(x) {
   if (!expanded) return;
   const rect = stack.getBoundingClientRect();
-  const inset = 18;
-  const ratio = Math.max(0, Math.min(1, (x - rect.left - inset) / Math.max(1, rect.width - inset * 2)));
-  active = Math.round(ratio * (tabs.length - 1));
-  update();
+  const pad = 12;
+  dragX = Math.max(pad, Math.min(stack.clientWidth - pad, x - rect.left));
+
+  let nearest = 0;
+  let distance = Infinity;
+  [...items.children].forEach((_, i) => {
+    const d = Math.abs(selectionCenter(i) - dragX);
+    if (d < distance) {
+      distance = d;
+      nearest = i;
+    }
+  });
+  active = nearest;
+  updateSelection();
+  [...items.children].forEach((el, i) => el.classList.toggle('active', i === active));
 }
 
 stack.addEventListener('pointerdown', e => {
