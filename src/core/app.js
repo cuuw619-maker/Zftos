@@ -15,8 +15,16 @@ const appBack = document.getElementById('appBack');
 const os = document.getElementById('os');
 
 const APPS_PER_PAGE = 8;
+const MOTION = {
+  openMs: 720,
+  closeMs: 560,
+  ease: 'cubic-bezier(.16,.9,.18,1)',
+};
+
 let currentPage = 0;
 let openedApp = null;
+let launchSource = null;
+let transitionTimer = 0;
 let pageScrollFrame = 0;
 
 function updateClock() {
@@ -103,12 +111,11 @@ function syncPageFromScroll() {
     if (!pages.clientWidth) return;
     const raw = pages.scrollLeft / pages.clientWidth;
     const next = Math.max(0, Math.min(Math.round(raw), pages.children.length - 1));
-    const progress = Math.max(0, Math.min(1, raw - Math.floor(raw)));
-    pages.style.setProperty('--page-progress', progress.toFixed(3));
     [...pages.children].forEach((page, index) => {
       const distance = Math.min(1, Math.abs(index - raw));
       page.style.setProperty('--page-depth', (1 - distance * 0.045).toFixed(3));
       page.style.setProperty('--page-alpha', (1 - distance * 0.12).toFixed(3));
+      page.style.setProperty('--page-shift', `${(index - raw) * 3}px`);
     });
     if (next !== currentPage) {
       currentPage = next;
@@ -120,52 +127,80 @@ function syncPageFromScroll() {
 function sourcePoint(sourceButton) {
   const rect = sourceButton.getBoundingClientRect();
   const osRect = os.getBoundingClientRect();
+  const x = rect.left - osRect.left + rect.width / 2;
+  const y = rect.top - osRect.top + rect.height / 2;
   return {
-    x: rect.left - osRect.left + rect.width / 2,
-    y: rect.top - osRect.top + rect.height / 2,
+    x, y,
     width: rect.width,
     height: rect.height,
+    radius: Math.min(18, Math.max(8, Math.min(rect.width, rect.height) * .3)),
   };
+}
+
+function setTransitionVars(point) {
+  appWindow.style.setProperty('--open-x', `${point.x}px`);
+  appWindow.style.setProperty('--open-y', `${point.y}px`);
+  appWindow.style.setProperty('--icon-w', `${point.width}px`);
+  appWindow.style.setProperty('--icon-h', `${point.height}px`);
+  appWindow.style.setProperty('--icon-r', `${point.radius}px`);
+  appWindow.style.setProperty('--transition-duration', `${MOTION.openMs}ms`);
+}
+
+function resetSource() {
+  if (!launchSource) return;
+  launchSource.classList.remove('launching');
+  launchSource = null;
+}
+
+function finishClose() {
+  clearTimeout(transitionTimer);
+  appWindow.classList.remove('closing', 'open');
+  appWindow.setAttribute('aria-hidden', 'true');
+  launchImage.removeAttribute('src');
+  resetSource();
+  openedApp = null;
+  engine.set('activeApp', null);
+  engine.emit('app:closed');
 }
 
 function openApp(app, sourceButton) {
   if (openedApp || !sourceButton) return;
   openedApp = app;
+  launchSource = sourceButton;
   const point = sourcePoint(sourceButton);
+  setTransitionVars(point);
 
-  appWindow.style.setProperty('--open-x', `${point.x}px`);
-  appWindow.style.setProperty('--open-y', `${point.y}px`);
-  appWindow.style.setProperty('--icon-w', `${point.width}px`);
-  appWindow.style.setProperty('--icon-h', `${point.height}px`);
   appWindowTitle.textContent = app.name;
   placeholderName.textContent = app.name;
   placeholderIcon.replaceChildren(createIcon(app.iconSrc, app.name, 'placeholder-image'));
   launchImage.src = assets.resolve(app.iconSrc);
   launchImage.alt = '';
-  appWindow.setAttribute('aria-hidden', 'false');
-  appWindow.classList.remove('closing');
+
   sourceButton.classList.add('launching');
-  requestAnimationFrame(() => appWindow.classList.add('open'));
+  appWindow.classList.remove('closing');
+  appWindow.classList.add('preparing');
+  appWindow.setAttribute('aria-hidden', 'false');
+  void appWindow.offsetWidth;
+
+  requestAnimationFrame(() => {
+    appWindow.classList.remove('preparing');
+    appWindow.classList.add('open');
+  });
+
   engine.set('activeApp', app.id);
-  engine.emit('app:open', app);
+  engine.emit('app:opening', { app, point });
+  transitionTimer = window.setTimeout(() => engine.emit('app:opened', app), MOTION.openMs);
 }
 
 function closeApp() {
-  if (!openedApp) return;
-  const closingApp = openedApp;
+  if (!openedApp || appWindow.classList.contains('closing')) return;
+  clearTimeout(transitionTimer);
+  appWindow.style.setProperty('--transition-duration', `${MOTION.closeMs}ms`);
   appWindow.classList.remove('open');
+  void appWindow.offsetWidth;
   appWindow.classList.add('closing');
-  engine.emit('app:close', closingApp);
-  const finish = () => {
-    appWindow.classList.remove('closing');
-    appWindow.setAttribute('aria-hidden', 'true');
-    launchImage.removeAttribute('src');
-    openedApp = null;
-    engine.set('activeApp', null);
-  };
-  appWindow.addEventListener('animationend', event => {
-    if (event.animationName === 'app-close') finish();
-  }, { once: true });
+  engine.emit('app:closing', openedApp);
+  transitionTimer = window.setTimeout(finishClose, MOTION.closeMs + 40);
 }
 
 engine.register('launch', openApp);
