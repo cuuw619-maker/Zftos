@@ -3,40 +3,24 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
-  <meta name="theme-color" content="#08090d">
-  <title>ZftOS</title>
+  <meta name="theme-color" content="#000">
+  <title>ZftOS — Floating Stack</title>
   <link rel="stylesheet" href="src/ui/style.css">
 </head>
 <body>
-  <main id="os" aria-label="ZftOS iOS 26 simulation">
-    <div class="wallpaper" aria-hidden="true"></div>
-    <div class="ambient" aria-hidden="true"></div>
+  <main id="simulation" aria-label="Floating Stack simulation">
+    <div class="background"></div>
+    <div class="screen-layer" id="screenLayer"></div>
+    <div class="screen-title" id="screenTitle">Главная</div>
 
-    <header class="status-bar">
-      <span id="clock">12:00</span>
-      <div class="status-right"><span>5G</span><span class="wifi">⌁</span><span class="battery"><i></i></span></div>
-    </header>
+    <div class="floating-stack" id="floatingStack">
+      <div class="glass" aria-hidden="true"></div>
+      <div class="shine" aria-hidden="true"></div>
+      <div class="selection" id="selection" aria-hidden="true"></div>
+      <div class="items" id="items"></div>
+    </div>
 
-    <section class="content" id="content">
-      <div class="content-top">
-        <div>
-          <p class="eyebrow" id="eyebrow">ZftOS</p>
-          <h1 id="screenTitle">Главная</h1>
-        </div>
-        <button class="profile" type="button" aria-label="Профиль">Z</button>
-      </div>
-      <div id="screen" class="screen"></div>
-    </section>
-
-    <div class="nav-hint" id="navHint">Зажмите овал и проведите пальцем</div>
-
-    <nav class="floating-nav" id="floatingNav" aria-label="Навигация по категориям">
-      <div class="nav-glow"></div>
-      <div class="nav-selection" id="navSelection"></div>
-      <div class="nav-items" id="navItems"></div>
-    </nav>
-
-    <div class="home-indicator" aria-hidden="true"></div>
+    <div class="hint" id="hint">Зажмите и проведите</div>
   </main>
   <script type="module" src="src/core/app.js"></script>
 </body>
