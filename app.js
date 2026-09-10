@@ -1,5 +1,0 @@
-const clock=document.getElementById('clock');const toast=document.getElementById('toast');let toastTimer;
-function updateClock(){clock.textContent=new Intl.DateTimeFormat('ru-RU',{hour:'2-digit',minute:'2-digit',hour12:false}).format(new Date())}updateClock();setInterval(updateClock,1000);
-function showToast(name){toast.textContent=`${name} — приложение пока не реализовано`;toast.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>toast.classList.remove('show'),1800)}
-document.querySelectorAll('[data-app]').forEach(el=>el.addEventListener('click',()=>showToast(el.dataset.app)));
-let startX,startY,dragging=false;const grid=document.getElementById('appGrid');grid.addEventListener('pointerdown',e=>{startX=e.clientX;startY=e.clientY;dragging=true});grid.addEventListener('pointerup',e=>{if(!dragging)return;dragging=false;const dx=e.clientX-startX,dy=e.clientY-startY;if(Math.abs(dx)>50||Math.abs(dy)>50){grid.style.transform=`translate(${Math.max(-25,Math.min(25,dx/5))}px,${Math.max(-15,Math.min(15,dy/5))}px)`;setTimeout(()=>grid.style.transform='',180)}});
