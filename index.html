@@ -3,49 +3,41 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
-  <meta name="theme-color" content="#050507">
+  <meta name="theme-color" content="#08090d">
   <title>ZftOS</title>
   <link rel="stylesheet" href="src/ui/style.css">
 </head>
 <body>
-  <div class="phone-shell" aria-label="ZftOS mobile device">
-    <div class="phone-frame">
-      <main id="os" aria-label="ZftOS">
-        <div class="wallpaper"></div>
-        <header class="status-bar">
-          <span id="clock">12:00</span>
-          <div class="status-icons" aria-label="Состояние устройства">
-            <span class="signal-icon" aria-label="Сеть"><i></i><i></i><i></i><i></i></span>
-            <span class="wifi-icon" aria-label="Wi-Fi"></span>
-            <span class="battery" aria-label="Батарея 100%"><span class="battery-level"></span></span>
-            <span class="battery-percent">100%</span>
-          </div>
-        </header>
+  <main id="os" aria-label="ZftOS iOS 26 simulation">
+    <div class="wallpaper" aria-hidden="true"></div>
+    <div class="ambient" aria-hidden="true"></div>
 
-        <section class="desktop" id="desktop" aria-label="Рабочий стол">
-          <div class="pages" id="pages"></div>
-          <div class="page-dots" id="pageDots" aria-label="Страницы рабочего стола"></div>
-        </section>
+    <header class="status-bar">
+      <span id="clock">12:00</span>
+      <div class="status-right"><span>5G</span><span class="wifi">⌁</span><span class="battery"><i></i></span></div>
+    </header>
 
-        <nav class="dock" id="dock" aria-label="Dock"></nav>
-        <div class="home-indicator" aria-hidden="true"></div>
+    <section class="content" id="content">
+      <div class="content-top">
+        <div>
+          <p class="eyebrow" id="eyebrow">ZftOS</p>
+          <h1 id="screenTitle">Главная</h1>
+        </div>
+        <button class="profile" type="button" aria-label="Профиль">Z</button>
+      </div>
+      <div id="screen" class="screen"></div>
+    </section>
 
-        <section class="app-window" id="appWindow" aria-hidden="true">
-          <div class="app-window-bg"></div>
-          <img class="launch-image" id="launchImage" alt="" aria-hidden="true">
-          <header class="app-window-bar">
-            <button class="app-back" id="appBack" type="button" aria-label="Назад">‹</button>
-            <div class="app-window-title" id="appWindowTitle"></div>
-          </header>
-          <div class="app-placeholder" id="appPlaceholder">
-            <div class="placeholder-icon" id="placeholderIcon"></div>
-            <h2 id="placeholderName"></h2>
-            <p>Интерфейс приложения — заглушка</p>
-          </div>
-        </section>
-      </main>
-    </div>
-  </div>
+    <div class="nav-hint" id="navHint">Зажмите овал и проведите пальцем</div>
+
+    <nav class="floating-nav" id="floatingNav" aria-label="Навигация по категориям">
+      <div class="nav-glow"></div>
+      <div class="nav-selection" id="navSelection"></div>
+      <div class="nav-items" id="navItems"></div>
+    </nav>
+
+    <div class="home-indicator" aria-hidden="true"></div>
+  </main>
   <script type="module" src="src/core/app.js"></script>
 </body>
 </html>
