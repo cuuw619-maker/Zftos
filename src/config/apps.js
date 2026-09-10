@@ -15,7 +15,7 @@ export const APPS = [
   { id: 'updater', name: 'Updater', iconSrc: 'com.android.updater.webp' },
 ];
 
-export const DOCK = ['phone', 'messages', 'browser', 'camera', 'settings'];
+export const DOCK = ['phone', 'messages', 'browser', 'camera'];
 
 export const SYSTEM_APPS = {
   phone: { id: 'phone', name: 'Phone', iconSrc: 'com.system.dialer.png' },
