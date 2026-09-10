@@ -22,12 +22,26 @@
           </div>
         </header>
 
-        <section class="desktop" id="desktop">
-          <div class="app-grid" id="appGrid" aria-label="Приложения"></div>
+        <section class="desktop" id="desktop" aria-label="Рабочий стол">
+          <div class="pages" id="pages"></div>
+          <div class="page-dots" id="pageDots" aria-label="Страницы рабочего стола"></div>
         </section>
 
         <nav class="dock" id="dock" aria-label="Dock"></nav>
         <div class="home-indicator" aria-hidden="true"></div>
+
+        <section class="app-window" id="appWindow" aria-hidden="true">
+          <div class="app-window-bg"></div>
+          <header class="app-window-bar">
+            <button class="app-back" id="appBack" type="button" aria-label="Назад">‹</button>
+            <div class="app-window-title" id="appWindowTitle"></div>
+          </header>
+          <div class="app-placeholder" id="appPlaceholder">
+            <div class="placeholder-icon" id="placeholderIcon"></div>
+            <h2 id="placeholderName"></h2>
+            <p>Интерфейс приложения — заглушка</p>
+          </div>
+        </section>
       </main>
     </div>
   </div>
