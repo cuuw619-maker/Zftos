@@ -1,221 +1,182 @@
-import { APPS, DOCK, SYSTEM_APPS } from '../config/apps.js';
 import { engine } from './engine.js';
-import { assets } from './assets.js';
 
 const clock = document.getElementById('clock');
-const pages = document.getElementById('pages');
-const pageDots = document.getElementById('pageDots');
-const dock = document.getElementById('dock');
-const appWindow = document.getElementById('appWindow');
-const appWindowTitle = document.getElementById('appWindowTitle');
-const placeholderName = document.getElementById('placeholderName');
-const placeholderIcon = document.getElementById('placeholderIcon');
-const launchImage = document.getElementById('launchImage');
-const appBack = document.getElementById('appBack');
-const os = document.getElementById('os');
+const title = document.getElementById('screenTitle');
+const eyebrow = document.getElementById('eyebrow');
+const screen = document.getElementById('screen');
+const nav = document.getElementById('floatingNav');
+const navItems = document.getElementById('navItems');
+const navSelection = document.getElementById('navSelection');
+const hint = document.getElementById('navHint');
 
-const APPS_PER_PAGE = 8;
-const MOTION = {
-  openMs: 720,
-  closeMs: 560,
-  ease: 'cubic-bezier(.16,.9,.18,1)',
-};
+const CATEGORIES = [
+  { id: 'home', icon: '⌂', title: 'Главная', subtitle: 'Ваше пространство', cards: ['Недавние', 'Избранное', 'Продолжить'] },
+  { id: 'apps', icon: '✦', title: 'Приложения', subtitle: 'Все приложения', cards: ['Медиа', 'Инструменты', 'Система'] },
+  { id: 'search', icon: '⌕', title: 'Поиск', subtitle: 'Найти что угодно', cards: ['Приложения', 'Файлы', 'Настройки'] },
+  { id: 'alerts', icon: '◌', title: 'Уведомления', subtitle: 'Всё важное здесь', cards: ['Сегодня', 'Сообщения', 'События'] },
+  { id: 'settings', icon: '⚙', title: 'Настройки', subtitle: 'Персонализация системы', cards: ['Внешний вид', 'Звук и тактильные сигналы', 'Конфиденциальность'] },
+];
 
-let currentPage = 0;
-let openedApp = null;
-let launchSource = null;
-let transitionTimer = 0;
-let pageScrollFrame = 0;
+let selected = 0;
+let expanded = false;
+let pressing = false;
+let pointerId = null;
+let startX = 0;
+let activeIndex = 0;
+let longPressTimer = 0;
+let pageTimer = 0;
 
 function updateClock() {
-  clock.textContent = new Intl.DateTimeFormat('ru-RU', {
-    hour: '2-digit', minute: '2-digit', hour12: false,
-  }).format(new Date());
+  clock.textContent = new Intl.DateTimeFormat('ru-RU', { hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date());
 }
 
-function createIcon(src, alt, className = 'icon') {
-  const image = assets.image(src, alt, className);
-  image.addEventListener('error', () => {
-    image.classList.add('icon-missing');
-    image.removeAttribute('src');
-  }, { once: true });
-  return image;
+function renderNav() {
+  navItems.replaceChildren();
+  CATEGORIES.forEach((item, index) => {
+    const button = document.createElement('button');
+    button.className = 'nav-item';
+    button.type = 'button';
+    button.dataset.index = index;
+    button.setAttribute('aria-label', item.title);
+    button.innerHTML = `<span class="nav-icon">${item.icon}</span><span class="nav-label">${item.title}</span>`;
+    button.addEventListener('click', () => selectCategory(index));
+    navItems.appendChild(button);
+  });
+  updateNav();
 }
 
-function createAppButton(app) {
-  const button = document.createElement('button');
-  button.className = 'app-icon';
-  button.type = 'button';
-  button.dataset.app = app.id;
-  button.appendChild(createIcon(app.iconSrc, `${app.name} icon`));
-  const label = document.createElement('b');
-  label.textContent = app.name;
-  button.appendChild(label);
-  button.addEventListener('click', () => engine.launch(app, button));
-  return button;
+function renderScreen() {
+  const item = CATEGORIES[selected];
+  title.textContent = item.title;
+  eyebrow.textContent = item.subtitle;
+  screen.className = `screen screen-${item.id}`;
+  screen.replaceChildren();
+
+  const hero = document.createElement('article');
+  hero.className = 'hero-card';
+  hero.innerHTML = `<span class="hero-symbol">${item.icon}</span><div><span class="card-kicker">${String(selected + 1).padStart(2, '0')} / ${String(CATEGORIES.length).padStart(2, '0')}</span><h2>${item.subtitle}</h2><p>Проведите по плавающему стеку, чтобы сменить контекст.</p></div>`;
+  screen.appendChild(hero);
+
+  const grid = document.createElement('div');
+  grid.className = 'card-grid';
+  item.cards.forEach((label, index) => {
+    const card = document.createElement('article');
+    card.className = 'glass-card';
+    card.style.setProperty('--delay', `${index * 55}ms`);
+    card.innerHTML = `<span class="mini-icon">${['◈', '◇', '○'][index]}</span><strong>${label}</strong><span class="chevron">›</span>`;
+    grid.appendChild(card);
+  });
+  screen.appendChild(grid);
 }
 
-function createDockButton(id) {
-  const app = APPS.find(item => item.id === id) || SYSTEM_APPS[id];
-  if (!app) return;
-  const button = document.createElement('button');
-  button.className = 'dock-icon';
-  button.type = 'button';
-  button.dataset.app = app.id;
-  button.title = app.name;
-  button.appendChild(createIcon(app.iconSrc, app.name, 'dock-image'));
-  button.addEventListener('click', () => engine.launch(app, button));
-  dock.appendChild(button);
-}
-
-function buildPages() {
-  pages.replaceChildren();
-  pageDots.replaceChildren();
-  const pageCount = Math.max(1, Math.ceil(APPS.length / APPS_PER_PAGE));
-
-  for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
-    const page = document.createElement('div');
-    page.className = 'desktop-page';
-    page.dataset.page = pageIndex;
-    APPS.slice(pageIndex * APPS_PER_PAGE, (pageIndex + 1) * APPS_PER_PAGE)
-      .forEach(app => page.appendChild(createAppButton(app)));
-    pages.appendChild(page);
-
-    const dot = document.createElement('button');
-    dot.className = 'page-dot';
-    dot.type = 'button';
-    dot.setAttribute('aria-label', `Страница ${pageIndex + 1}`);
-    dot.addEventListener('click', () => goToPage(pageIndex));
-    pageDots.appendChild(dot);
+function updateNav() {
+  [...navItems.children].forEach((item, index) => {
+    item.classList.toggle('selected', index === selected);
+    item.classList.toggle('preview', expanded && index === activeIndex);
+  });
+  const target = navItems.children[expanded ? activeIndex : selected];
+  if (target) {
+    const navRect = nav.getBoundingClientRect();
+    const rect = target.getBoundingClientRect();
+    navSelection.style.width = `${rect.width}px`;
+    navSelection.style.height = `${rect.height}px`;
+    navSelection.style.transform = `translate(${rect.left - navRect.left}px, ${rect.top - navRect.top}px)`;
   }
-  updatePageDots();
+  nav.classList.toggle('expanded', expanded);
+  nav.style.setProperty('--active', expanded ? activeIndex : selected);
 }
 
-function goToPage(page) {
-  const max = Math.max(0, pages.children.length - 1);
-  currentPage = Math.max(0, Math.min(page, max));
-  pages.scrollTo({ left: pages.clientWidth * currentPage, behavior: 'smooth' });
-  updatePageDots();
+function selectCategory(index) {
+  selected = Math.max(0, Math.min(CATEGORIES.length - 1, index));
+  activeIndex = selected;
+  renderScreen();
+  updateNav();
+  engine.set('category', CATEGORIES[selected].id);
+  engine.emit('navigation:changed', CATEGORIES[selected]);
 }
 
-function updatePageDots() {
-  [...pageDots.children].forEach((dot, index) => {
-    dot.classList.toggle('active', index === currentPage);
-    dot.setAttribute('aria-current', index === currentPage ? 'page' : 'false');
-  });
+function expand() {
+  if (expanded) return;
+  expanded = true;
+  activeIndex = selected;
+  hint.classList.add('hidden');
+  updateNav();
+  engine.emit('navigation:expanded');
 }
 
-function syncPageFromScroll() {
-  cancelAnimationFrame(pageScrollFrame);
-  pageScrollFrame = requestAnimationFrame(() => {
-    if (!pages.clientWidth) return;
-    const raw = pages.scrollLeft / pages.clientWidth;
-    const next = Math.max(0, Math.min(Math.round(raw), pages.children.length - 1));
-    [...pages.children].forEach((page, index) => {
-      const distance = Math.min(1, Math.abs(index - raw));
-      page.style.setProperty('--page-depth', (1 - distance * 0.045).toFixed(3));
-      page.style.setProperty('--page-alpha', (1 - distance * 0.12).toFixed(3));
-      page.style.setProperty('--page-shift', `${(index - raw) * 3}px`);
-    });
-    if (next !== currentPage) {
-      currentPage = next;
-      updatePageDots();
-    }
-  });
+function collapse(commit = true) {
+  clearTimeout(longPressTimer);
+  if (!expanded) return;
+  const next = activeIndex;
+  expanded = false;
+  if (commit && next !== selected) selectCategory(next);
+  else updateNav();
+  engine.emit('navigation:collapsed', { index: next });
 }
 
-function sourcePoint(sourceButton) {
-  const rect = sourceButton.getBoundingClientRect();
-  const osRect = os.getBoundingClientRect();
-  const x = rect.left - osRect.left + rect.width / 2;
-  const y = rect.top - osRect.top + rect.height / 2;
-  return {
-    x, y,
-    width: rect.width,
-    height: rect.height,
-    radius: Math.min(18, Math.max(8, Math.min(rect.width, rect.height) * .3)),
-  };
+function moveSelection(clientX) {
+  if (!expanded) return;
+  const rect = nav.getBoundingClientRect();
+  const usable = Math.max(1, rect.width - 28);
+  const x = Math.max(14, Math.min(rect.width - 14, clientX - rect.left));
+  const ratio = (x - 14) / usable;
+  activeIndex = Math.max(0, Math.min(CATEGORIES.length - 1, Math.round(ratio * (CATEGORIES.length - 1))));
+  updateNav();
+  if (activeIndex !== selected) {
+    renderPreview(activeIndex);
+  }
 }
 
-function setTransitionVars(point) {
-  appWindow.style.setProperty('--open-x', `${point.x}px`);
-  appWindow.style.setProperty('--open-y', `${point.y}px`);
-  appWindow.style.setProperty('--icon-w', `${point.width}px`);
-  appWindow.style.setProperty('--icon-h', `${point.height}px`);
-  appWindow.style.setProperty('--icon-r', `${point.radius}px`);
-  appWindow.style.setProperty('--transition-duration', `${MOTION.openMs}ms`);
+function renderPreview(index) {
+  const item = CATEGORIES[index];
+  title.textContent = item.title;
+  eyebrow.textContent = item.subtitle;
 }
 
-function resetSource() {
-  if (!launchSource) return;
-  launchSource.classList.remove('launching');
-  launchSource = null;
+function pointerDown(event) {
+  if (pointerId !== null) return;
+  pointerId = event.pointerId;
+  startX = event.clientX;
+  pressing = true;
+  nav.setPointerCapture?.(pointerId);
+  longPressTimer = window.setTimeout(expand, 210);
 }
 
-function finishClose() {
-  clearTimeout(transitionTimer);
-  appWindow.classList.remove('closing', 'open');
-  appWindow.setAttribute('aria-hidden', 'true');
-  launchImage.removeAttribute('src');
-  resetSource();
-  openedApp = null;
-  engine.set('activeApp', null);
-  engine.emit('app:closed');
+function pointerMove(event) {
+  if (!pressing || event.pointerId !== pointerId) return;
+  if (!expanded && Math.abs(event.clientX - startX) > 10) clearTimeout(longPressTimer);
+  if (expanded) moveSelection(event.clientX);
 }
 
-function openApp(app, sourceButton) {
-  if (openedApp || !sourceButton) return;
-  openedApp = app;
-  launchSource = sourceButton;
-  const point = sourcePoint(sourceButton);
-  setTransitionVars(point);
-
-  appWindowTitle.textContent = app.name;
-  placeholderName.textContent = app.name;
-  placeholderIcon.replaceChildren(createIcon(app.iconSrc, app.name, 'placeholder-image'));
-  launchImage.src = assets.resolve(app.iconSrc);
-  launchImage.alt = '';
-
-  sourceButton.classList.add('launching');
-  appWindow.classList.remove('closing');
-  appWindow.classList.add('preparing');
-  appWindow.setAttribute('aria-hidden', 'false');
-  void appWindow.offsetWidth;
-
-  requestAnimationFrame(() => {
-    appWindow.classList.remove('preparing');
-    appWindow.classList.add('open');
-  });
-
-  engine.set('activeApp', app.id);
-  engine.emit('app:opening', { app, point });
-  transitionTimer = window.setTimeout(() => engine.emit('app:opened', app), MOTION.openMs);
+function pointerUp(event) {
+  if (event.pointerId !== pointerId) return;
+  clearTimeout(longPressTimer);
+  pressing = false;
+  if (expanded) collapse(true);
+  pointerId = null;
 }
 
-function closeApp() {
-  if (!openedApp || appWindow.classList.contains('closing')) return;
-  clearTimeout(transitionTimer);
-  appWindow.style.setProperty('--transition-duration', `${MOTION.closeMs}ms`);
-  appWindow.classList.remove('open');
-  void appWindow.offsetWidth;
-  appWindow.classList.add('closing');
-  engine.emit('app:closing', openedApp);
-  transitionTimer = window.setTimeout(finishClose, MOTION.closeMs + 40);
-}
-
-engine.register('launch', openApp);
-engine.register('close', closeApp);
-pages.addEventListener('scroll', syncPageFromScroll, { passive: true });
-appBack.addEventListener('click', closeApp);
-document.addEventListener('keydown', event => {
-  if (event.key === 'Escape' && openedApp) closeApp();
-  if (!openedApp && (event.key === 'ArrowRight' || event.key === 'ArrowLeft')) {
-    goToPage(currentPage + (event.key === 'ArrowRight' ? 1 : -1));
+nav.addEventListener('pointerdown', pointerDown);
+nav.addEventListener('pointermove', pointerMove);
+nav.addEventListener('pointerup', pointerUp);
+nav.addEventListener('pointercancel', pointerUp);
+nav.addEventListener('lostpointercapture', () => {
+  if (pressing) {
+    clearTimeout(longPressTimer);
+    pressing = false;
+    if (expanded) collapse(true);
+    pointerId = null;
   }
 });
 
-buildPages();
-dock.replaceChildren();
-DOCK.forEach(createDockButton);
+engine.register('selectCategory', selectCategory);
+engine.on('navigation:changed', () => {
+  clearTimeout(pageTimer);
+  pageTimer = window.setTimeout(() => engine.emit('navigation:settled', CATEGORIES[selected]), 280);
+});
+
+renderNav();
+renderScreen();
 updateClock();
 setInterval(updateClock, 1000);
+window.addEventListener('resize', updateNav);
