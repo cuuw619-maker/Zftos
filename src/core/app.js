@@ -1,5 +1,7 @@
 import { APPS, DOCK, SYSTEM_APPS } from '../config/apps.js';
+import { ZftEngine } from './engine.js';
 
+const engine = new ZftEngine();
 const clock = document.getElementById('clock');
 const pages = document.getElementById('pages');
 const pageDots = document.getElementById('pageDots');
@@ -9,6 +11,7 @@ const appWindowTitle = document.getElementById('appWindowTitle');
 const placeholderName = document.getElementById('placeholderName');
 const placeholderIcon = document.getElementById('placeholderIcon');
 const appBack = document.getElementById('appBack');
+const os = document.getElementById('os');
 
 const APPS_PER_PAGE = 8;
 let currentPage = 0;
@@ -31,7 +34,10 @@ function createIcon(src, alt, className = 'icon') {
   image.alt = alt;
   image.draggable = false;
   image.loading = 'eager';
-  image.onerror = () => image.classList.add('icon-missing');
+  image.onerror = () => {
+    image.classList.add('icon-missing');
+    image.removeAttribute('src');
+  };
   return image;
 }
 
@@ -44,7 +50,7 @@ function createAppButton(app) {
   const label = document.createElement('b');
   label.textContent = app.name;
   button.appendChild(label);
-  button.addEventListener('click', () => openApp(app, button));
+  button.addEventListener('click', () => engine.launch(app, button));
   return button;
 }
 
@@ -57,29 +63,25 @@ function createDockButton(id) {
   button.dataset.app = app.id;
   button.title = app.name;
   button.appendChild(createIcon(app.iconSrc, app.name, 'dock-image'));
-  button.addEventListener('click', () => openApp(app, button));
+  button.addEventListener('click', () => engine.launch(app, button));
   dock.appendChild(button);
 }
 
 function buildPages() {
-  const chunks = [];
-  for (let i = 0; i < APPS.length; i += APPS_PER_PAGE) chunks.push(APPS.slice(i, i + APPS_PER_PAGE));
-
-  chunks.forEach((chunk, pageIndex) => {
+  for (let i = 0; i < APPS.length; i += APPS_PER_PAGE) {
     const page = document.createElement('div');
     page.className = 'desktop-page';
-    page.dataset.page = pageIndex;
-    chunk.forEach(app => page.appendChild(createAppButton(app)));
+    page.dataset.page = i / APPS_PER_PAGE;
+    APPS.slice(i, i + APPS_PER_PAGE).forEach(app => page.appendChild(createAppButton(app)));
     pages.appendChild(page);
 
     const dot = document.createElement('button');
     dot.className = 'page-dot';
     dot.type = 'button';
-    dot.setAttribute('aria-label', `Страница ${pageIndex + 1}`);
-    dot.addEventListener('click', () => goToPage(pageIndex));
+    dot.setAttribute('aria-label', `Страница ${i / APPS_PER_PAGE + 1}`);
+    dot.addEventListener('click', () => goToPage(i / APPS_PER_PAGE));
     pageDots.appendChild(dot);
-  });
-
+  }
   updatePageDots();
 }
 
@@ -105,9 +107,8 @@ function syncPageFromScroll() {
 function openApp(app, sourceButton) {
   if (openedApp) return;
   openedApp = app;
-
   const rect = sourceButton.getBoundingClientRect();
-  const osRect = document.getElementById('os').getBoundingClientRect();
+  const osRect = os.getBoundingClientRect();
   const x = rect.left - osRect.left + rect.width / 2;
   const y = rect.top - osRect.top + rect.height / 2;
 
@@ -132,9 +133,10 @@ function closeApp() {
   }, { once: true });
 }
 
+engine.register('launch', openApp);
+engine.register('close', closeApp);
 pages.addEventListener('scroll', syncPageFromScroll, { passive: true });
 appBack.addEventListener('click', closeApp);
-
 document.addEventListener('keydown', event => {
   if (event.key === 'Escape' && openedApp) closeApp();
 });
