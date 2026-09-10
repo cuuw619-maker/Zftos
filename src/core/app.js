@@ -19,11 +19,25 @@ function showToast(name) {
   toastTimer = setTimeout(() => toast.classList.remove('show'), 1800);
 }
 
+function createIcon(src, alt, className = 'icon') {
+  const image = document.createElement('img');
+  image.className = className;
+  image.src = src;
+  image.alt = alt;
+  image.draggable = false;
+  image.loading = 'eager';
+  image.onerror = () => image.classList.add('icon-missing');
+  return image;
+}
+
 function createAppButton(app) {
   const button = document.createElement('button');
   button.className = 'app-icon';
   button.dataset.app = app.name;
-  button.innerHTML = `<span class="icon ${app.iconClass || ''}">${app.icon}</span><b>${app.name}</b>`;
+  button.appendChild(createIcon(app.iconSrc, `${app.name} icon`));
+  const label = document.createElement('b');
+  label.textContent = app.name;
+  button.appendChild(label);
   button.addEventListener('click', () => showToast(app.name));
   return button;
 }
@@ -34,8 +48,8 @@ function createDockButton(id) {
   const button = document.createElement('button');
   button.className = 'dock-icon';
   button.dataset.app = app.name;
-  button.textContent = app.icon;
   button.title = app.name;
+  button.appendChild(createIcon(app.iconSrc, app.name, 'dock-image'));
   button.addEventListener('click', () => showToast(app.name));
   dock.appendChild(button);
 }
@@ -63,3 +77,4 @@ grid.addEventListener('pointerup', event => {
     setTimeout(() => { grid.style.transform = ''; }, 180);
   }
 });
+grid.addEventListener('pointercancel', () => { dragging = false; });
