@@ -1,7 +1,7 @@
 import { APPS, DOCK, SYSTEM_APPS } from '../config/apps.js';
-import { ZftEngine } from './engine.js';
+import { engine } from './engine.js';
+import { assets } from './assets.js';
 
-const engine = new ZftEngine();
 const clock = document.getElementById('clock');
 const pages = document.getElementById('pages');
 const pageDots = document.getElementById('pageDots');
@@ -10,12 +10,14 @@ const appWindow = document.getElementById('appWindow');
 const appWindowTitle = document.getElementById('appWindowTitle');
 const placeholderName = document.getElementById('placeholderName');
 const placeholderIcon = document.getElementById('placeholderIcon');
+const launchImage = document.getElementById('launchImage');
 const appBack = document.getElementById('appBack');
 const os = document.getElementById('os');
 
 const APPS_PER_PAGE = 8;
 let currentPage = 0;
 let openedApp = null;
+let pageScrollFrame = 0;
 
 function updateClock() {
   clock.textContent = new Intl.DateTimeFormat('ru-RU', {
@@ -23,21 +25,12 @@ function updateClock() {
   }).format(new Date());
 }
 
-function resolveIcon(src) {
-  return new URL(`../../${src}`, import.meta.url).href;
-}
-
 function createIcon(src, alt, className = 'icon') {
-  const image = document.createElement('img');
-  image.className = className;
-  image.src = resolveIcon(src);
-  image.alt = alt;
-  image.draggable = false;
-  image.loading = 'eager';
-  image.onerror = () => {
+  const image = assets.image(src, alt, className);
+  image.addEventListener('error', () => {
     image.classList.add('icon-missing');
     image.removeAttribute('src');
-  };
+  }, { once: true });
   return image;
 }
 
@@ -68,68 +61,110 @@ function createDockButton(id) {
 }
 
 function buildPages() {
-  for (let i = 0; i < APPS.length; i += APPS_PER_PAGE) {
+  pages.replaceChildren();
+  pageDots.replaceChildren();
+  const pageCount = Math.max(1, Math.ceil(APPS.length / APPS_PER_PAGE));
+
+  for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
     const page = document.createElement('div');
     page.className = 'desktop-page';
-    page.dataset.page = i / APPS_PER_PAGE;
-    APPS.slice(i, i + APPS_PER_PAGE).forEach(app => page.appendChild(createAppButton(app)));
+    page.dataset.page = pageIndex;
+    APPS.slice(pageIndex * APPS_PER_PAGE, (pageIndex + 1) * APPS_PER_PAGE)
+      .forEach(app => page.appendChild(createAppButton(app)));
     pages.appendChild(page);
 
     const dot = document.createElement('button');
     dot.className = 'page-dot';
     dot.type = 'button';
-    dot.setAttribute('aria-label', `Страница ${i / APPS_PER_PAGE + 1}`);
-    dot.addEventListener('click', () => goToPage(i / APPS_PER_PAGE));
+    dot.setAttribute('aria-label', `Страница ${pageIndex + 1}`);
+    dot.addEventListener('click', () => goToPage(pageIndex));
     pageDots.appendChild(dot);
   }
   updatePageDots();
 }
 
 function goToPage(page) {
-  currentPage = Math.max(0, Math.min(page, pages.children.length - 1));
+  const max = Math.max(0, pages.children.length - 1);
+  currentPage = Math.max(0, Math.min(page, max));
   pages.scrollTo({ left: pages.clientWidth * currentPage, behavior: 'smooth' });
   updatePageDots();
 }
 
 function updatePageDots() {
-  [...pageDots.children].forEach((dot, index) => dot.classList.toggle('active', index === currentPage));
+  [...pageDots.children].forEach((dot, index) => {
+    dot.classList.toggle('active', index === currentPage);
+    dot.setAttribute('aria-current', index === currentPage ? 'page' : 'false');
+  });
 }
 
 function syncPageFromScroll() {
-  if (!pages.clientWidth) return;
-  const next = Math.round(pages.scrollLeft / pages.clientWidth);
-  if (next !== currentPage) {
-    currentPage = next;
-    updatePageDots();
-  }
+  cancelAnimationFrame(pageScrollFrame);
+  pageScrollFrame = requestAnimationFrame(() => {
+    if (!pages.clientWidth) return;
+    const raw = pages.scrollLeft / pages.clientWidth;
+    const next = Math.max(0, Math.min(Math.round(raw), pages.children.length - 1));
+    const progress = Math.max(0, Math.min(1, raw - Math.floor(raw)));
+    pages.style.setProperty('--page-progress', progress.toFixed(3));
+    [...pages.children].forEach((page, index) => {
+      const distance = Math.min(1, Math.abs(index - raw));
+      page.style.setProperty('--page-depth', (1 - distance * 0.045).toFixed(3));
+      page.style.setProperty('--page-alpha', (1 - distance * 0.12).toFixed(3));
+    });
+    if (next !== currentPage) {
+      currentPage = next;
+      updatePageDots();
+    }
+  });
+}
+
+function sourcePoint(sourceButton) {
+  const rect = sourceButton.getBoundingClientRect();
+  const osRect = os.getBoundingClientRect();
+  return {
+    x: rect.left - osRect.left + rect.width / 2,
+    y: rect.top - osRect.top + rect.height / 2,
+    width: rect.width,
+    height: rect.height,
+  };
 }
 
 function openApp(app, sourceButton) {
-  if (openedApp) return;
+  if (openedApp || !sourceButton) return;
   openedApp = app;
-  const rect = sourceButton.getBoundingClientRect();
-  const osRect = os.getBoundingClientRect();
-  const x = rect.left - osRect.left + rect.width / 2;
-  const y = rect.top - osRect.top + rect.height / 2;
+  const point = sourcePoint(sourceButton);
 
-  appWindow.style.setProperty('--open-x', `${x}px`);
-  appWindow.style.setProperty('--open-y', `${y}px`);
+  appWindow.style.setProperty('--open-x', `${point.x}px`);
+  appWindow.style.setProperty('--open-y', `${point.y}px`);
+  appWindow.style.setProperty('--icon-w', `${point.width}px`);
+  appWindow.style.setProperty('--icon-h', `${point.height}px`);
   appWindowTitle.textContent = app.name;
   placeholderName.textContent = app.name;
   placeholderIcon.replaceChildren(createIcon(app.iconSrc, app.name, 'placeholder-image'));
+  launchImage.src = assets.resolve(app.iconSrc);
+  launchImage.alt = '';
   appWindow.setAttribute('aria-hidden', 'false');
   appWindow.classList.remove('closing');
+  sourceButton.classList.add('launching');
   requestAnimationFrame(() => appWindow.classList.add('open'));
+  engine.set('activeApp', app.id);
+  engine.emit('app:open', app);
 }
 
 function closeApp() {
   if (!openedApp) return;
+  const closingApp = openedApp;
   appWindow.classList.remove('open');
   appWindow.classList.add('closing');
-  appWindow.addEventListener('animationend', () => {
+  engine.emit('app:close', closingApp);
+  const finish = () => {
     appWindow.classList.remove('closing');
     appWindow.setAttribute('aria-hidden', 'true');
+    launchImage.removeAttribute('src');
     openedApp = null;
+    engine.set('activeApp', null);
+  };
+  appWindow.addEventListener('animationend', event => {
+    if (event.animationName === 'app-close') finish();
   }, { once: true });
 }
 
@@ -139,9 +174,13 @@ pages.addEventListener('scroll', syncPageFromScroll, { passive: true });
 appBack.addEventListener('click', closeApp);
 document.addEventListener('keydown', event => {
   if (event.key === 'Escape' && openedApp) closeApp();
+  if (!openedApp && (event.key === 'ArrowRight' || event.key === 'ArrowLeft')) {
+    goToPage(currentPage + (event.key === 'ArrowRight' ? 1 : -1));
+  }
 });
 
 buildPages();
+dock.replaceChildren();
 DOCK.forEach(createDockButton);
 updateClock();
 setInterval(updateClock, 1000);
