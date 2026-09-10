@@ -3,25 +3,31 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
-  <meta name="theme-color" content="#101114">
+  <meta name="theme-color" content="#050507">
   <title>ZftOS</title>
   <link rel="stylesheet" href="src/ui/style.css">
 </head>
 <body>
-  <main id="os" aria-label="ZftOS">
-    <div class="wallpaper"></div>
-    <header class="status-bar">
-      <span id="clock">12:00</span>
-      <div class="status-icons"><span>▴</span><span>Wi‑Fi</span><span>▮▮▮</span><span>100%</span></div>
-    </header>
+  <div class="phone-shell" aria-label="ZftOS mobile device">
+    <div class="phone-frame">
+      <div class="phone-speaker" aria-hidden="true"></div>
+      <main id="os" aria-label="ZftOS">
+        <div class="wallpaper"></div>
+        <header class="status-bar">
+          <span id="clock">12:00</span>
+          <div class="status-icons"><span>▴</span><span>Wi‑Fi</span><span>▮▮▮</span><span>100%</span></div>
+        </header>
 
-    <section class="desktop" id="desktop">
-      <div class="app-grid" id="appGrid" aria-label="Приложения"></div>
-    </section>
+        <section class="desktop" id="desktop">
+          <div class="app-grid" id="appGrid" aria-label="Приложения"></div>
+        </section>
 
-    <nav class="dock" id="dock" aria-label="Dock"></nav>
-    <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  </main>
+        <nav class="dock" id="dock" aria-label="Dock"></nav>
+        <div class="toast" id="toast" role="status" aria-live="polite"></div>
+        <div class="home-indicator" aria-hidden="true"></div>
+      </main>
+    </div>
+  </div>
   <script type="module" src="src/core/app.js"></script>
 </body>
 </html>
