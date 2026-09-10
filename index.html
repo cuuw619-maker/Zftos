@@ -10,12 +10,16 @@
 <body>
   <div class="phone-shell" aria-label="ZftOS mobile device">
     <div class="phone-frame">
-      <div class="phone-speaker" aria-hidden="true"></div>
       <main id="os" aria-label="ZftOS">
         <div class="wallpaper"></div>
         <header class="status-bar">
           <span id="clock">12:00</span>
-          <div class="status-icons"><span>▴</span><span>Wi‑Fi</span><span>▮▮▮</span><span>100%</span></div>
+          <div class="status-icons" aria-label="Состояние устройства">
+            <span class="signal-icon" aria-label="Сеть"><i></i><i></i><i></i><i></i></span>
+            <span class="wifi-icon" aria-label="Wi-Fi"></span>
+            <span class="battery" aria-label="Батарея 100%"><span class="battery-level"></span></span>
+            <span class="battery-percent">100%</span>
+          </div>
         </header>
 
         <section class="desktop" id="desktop">
@@ -23,7 +27,6 @@
         </section>
 
         <nav class="dock" id="dock" aria-label="Dock"></nav>
-        <div class="toast" id="toast" role="status" aria-live="polite"></div>
         <div class="home-indicator" aria-hidden="true"></div>
       </main>
     </div>
