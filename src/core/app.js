@@ -16,14 +16,14 @@ const tabs = [
 let selected = 0;
 let active = 0;
 let pointerId = null;
-let startX = 0;
+let pressTimer = 0;
+let dragging = false;
 let dragX = 0;
-let timer = 0;
-let expanded = false;
+let springFrame = 0;
 
 function render() {
   items.replaceChildren();
-  tabs.forEach(([icon, name], index) => {
+  tabs.forEach(([icon], index) => {
     const item = document.createElement('button');
     item.className = 'item';
     item.type = 'button';
@@ -32,107 +32,117 @@ function render() {
     item.addEventListener('click', () => select(index));
     items.appendChild(item);
   });
-  update();
+  sync();
 }
 
-function selectionCenter(index) {
+function centerFor(index) {
   const item = items.children[index];
-  if (!item) return stack.clientWidth / 2;
-  return item.offsetLeft + item.offsetWidth / 2;
+  return item ? item.offsetLeft + item.offsetWidth / 2 : stack.clientWidth / 2;
 }
 
-function updateSelection(animated = true) {
-  const target = expanded ? dragX : selectionCenter(selected);
-  selection.style.transition = animated ? '' : 'none';
-  selection.style.left = `${target}px`;
-  if (!animated) requestAnimationFrame(() => selection.style.transition = '');
+function setSelection(x, animate = true) {
+  selection.style.transition = animate ? '' : 'none';
+  selection.style.left = `${x}px`;
+  if (!animate) requestAnimationFrame(() => selection.style.transition = '');
 }
 
-function update() {
-  stack.classList.toggle('expanded', expanded);
+function sync() {
   [...items.children].forEach((el, i) => {
     el.classList.toggle('selected', i === selected);
     el.classList.toggle('active', i === active);
   });
-  if (!expanded) dragX = selectionCenter(selected);
-  updateSelection();
-  title.textContent = tabs[expanded ? active : selected][1];
+  if (!dragging) setSelection(centerFor(selected));
 }
 
 function select(index) {
   selected = index;
   active = index;
   layer.dataset.screen = index;
-  update();
+  sync();
 }
 
-function openStack() {
-  if (expanded) return;
-  expanded = true;
+function beginPress() {
+  if (dragging) return;
+  dragging = true;
   active = selected;
+  dragX = centerFor(selected);
+  stack.classList.add('dragging');
   hint.classList.add('hidden');
-  update();
-  requestAnimationFrame(() => {
-    dragX = selectionCenter(selected);
-    updateSelection(false);
-  });
+  setSelection(dragX, false);
+  requestAnimationFrame(() => setSelection(dragX, true));
 }
 
-function closeStack() {
-  clearTimeout(timer);
-  if (!expanded) return;
-  expanded = false;
-  select(active);
-}
-
-function move(x) {
-  if (!expanded) return;
-  const rect = stack.getBoundingClientRect();
-  const pad = 12;
-  dragX = Math.max(pad, Math.min(stack.clientWidth - pad, x - rect.left));
-
+function nearestIndex(x) {
   let nearest = 0;
   let distance = Infinity;
   [...items.children].forEach((_, i) => {
-    const d = Math.abs(selectionCenter(i) - dragX);
+    const d = Math.abs(centerFor(i) - x);
     if (d < distance) {
       distance = d;
       nearest = i;
     }
   });
-  active = nearest;
-  updateSelection();
+  return nearest;
+}
+
+function move(e) {
+  if (!dragging || e.pointerId !== pointerId) return;
+  const rect = stack.getBoundingClientRect();
+  const radius = 12;
+  dragX = Math.max(radius, Math.min(stack.clientWidth - radius, e.clientX - rect.left));
+  setSelection(dragX, false);
+  active = nearestIndex(dragX);
   [...items.children].forEach((el, i) => el.classList.toggle('active', i === active));
+}
+
+function springTo(target) {
+  cancelAnimationFrame(springFrame);
+  const start = dragX;
+  const startTime = performance.now();
+  const duration = 360;
+  const frame = now => {
+    const p = Math.min(1, (now - startTime) / duration);
+    const eased = 1 - Math.pow(1 - p, 4);
+    dragX = start + (target - start) * eased;
+    setSelection(dragX, false);
+    if (p < 1) springFrame = requestAnimationFrame(frame);
+    else {
+      dragX = target;
+      setSelection(target, false);
+      selected = active;
+      dragging = false;
+      stack.classList.remove('dragging');
+      sync();
+    }
+  };
+  springFrame = requestAnimationFrame(frame);
+}
+
+function release(e) {
+  if (e.pointerId !== pointerId) return;
+  clearTimeout(pressTimer);
+  if (dragging) springTo(centerFor(active));
+  pointerId = null;
 }
 
 stack.addEventListener('pointerdown', e => {
   if (pointerId !== null) return;
   pointerId = e.pointerId;
-  startX = e.clientX;
-  stack.setPointerCapture?.(pointerId);
-  timer = setTimeout(openStack, 190);
+  stack.setPointerCapture?.(e.pointerId);
+  pressTimer = setTimeout(beginPress, 190);
 });
 
-stack.addEventListener('pointermove', e => {
-  if (e.pointerId !== pointerId) return;
-  if (!expanded && Math.abs(e.clientX - startX) > 12) clearTimeout(timer);
-  move(e.clientX);
-});
-
-function release(e) {
-  if (e.pointerId !== pointerId) return;
-  clearTimeout(timer);
-  if (expanded) closeStack();
-  pointerId = null;
-}
-
+stack.addEventListener('pointermove', move);
 stack.addEventListener('pointerup', release);
 stack.addEventListener('pointercancel', release);
 stack.addEventListener('lostpointercapture', () => {
-  clearTimeout(timer);
-  if (expanded) closeStack();
+  clearTimeout(pressTimer);
+  if (dragging) springTo(centerFor(active));
   pointerId = null;
 });
 
-window.addEventListener('resize', update);
+window.addEventListener('resize', () => {
+  if (!dragging) sync();
+});
+
 render();
